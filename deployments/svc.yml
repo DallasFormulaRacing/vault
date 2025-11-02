@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  annotations:
+    tailscale.com/expose: "true"
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: vault

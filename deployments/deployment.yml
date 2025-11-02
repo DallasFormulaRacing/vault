@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: Vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: Vault
+  template:
+    metadata:
+      labels:
+        app: Vault
+    spec:
+      containers:
+      - name: Vault
+        image: Vault:latest
+        ports:
+        - containerPort: 8080
+        env:
+          - name: PG_HOST
+            valueFrom:
+              secretKeyRef:
+                name: vault
+                key: DB_HOST
+          - name: PG_NAME
+            valueFrom:
+              secretKeyRef:
+                name: vault
+                key: DB_NAME
+          - name: PG_USER
+            valueFrom:
+              secretKeyRef:
+                name: vault
+                key: DB_USER
+          - name: PG_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: vault
+                key: DB_PASSWORD
+          - name: PG_PORT
+            valueFrom:
+              secretKeyRef:
+                name: vault
+                key: DB_PORT
