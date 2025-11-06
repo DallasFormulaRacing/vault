@@ -1,0 +1,9 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: vault-strip
+  namespace: vault
+spec:
+  stripPrefix:
+    prefixes:
+      - /v1/vault
