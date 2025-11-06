@@ -11,7 +11,7 @@ spec:
       http:
         paths:
           - path: /v1/vault
-            pathType: Exact
+            pathType: Prefix
             backend:
               service:
                 name:  vault
