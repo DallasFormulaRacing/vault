@@ -4,7 +4,7 @@ metadata:
   name: vault
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
-
+    traefik.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
     - host: api.dallasformularacing.com
@@ -14,6 +14,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name:  vault
+                name: vault
                 port:
                   number: 80
