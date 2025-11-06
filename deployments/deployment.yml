@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: vault
-        image: dallasformularacing/vault:af7644495bf0a18dc256889b3dc2529c656418d9
+        image: dallasformularacing/vault:1dc513b8a8b18c396d76ad2949a0e0b81f5013e0
         ports:
         - containerPort: 8080
         env:
