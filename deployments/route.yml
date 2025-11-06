@@ -2,16 +2,18 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: vault
-  namespace: vault
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+
 spec:
   rules:
-    - host: "vault.dallasformularacing.com"
+    - host: api.dallasformularacing.com
       http:
         paths:
-          - path: /
-            pathType: Prefix
+          - path: /v1/vault
+            pathType: Exact
             backend:
               service:
-                name: vault
+                name:  vault
                 port:
                   number: 80
