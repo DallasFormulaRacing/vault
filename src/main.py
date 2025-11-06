@@ -29,12 +29,12 @@ FastAPI.openapi = openapi
 app = FastAPI()
 
 
-@app.get("/", response_model=status_schema)
+@app.get("/v1/vault", response_model=status_schema)
 async def read_root():
     return JSONResponse(content={"status": "ok", "version": "v0.1.0"}, status_code=200)
 
 
-@app.get("/decrypt_vault", response_model=vault_structure_schema)
+@app.get("/v1/vault/decrypt_vault", response_model=vault_structure_schema)
 async def decrypt_vault(x_vault_key: str | None = Header(default=None)):
     if x_vault_key:
         project_key, salt, timestamp = x_vault_key.split('.')
@@ -49,12 +49,12 @@ async def decrypt_vault(x_vault_key: str | None = Header(default=None)):
     return JSONResponse(content={"message": "Invalid request."}, status_code=400)
 
 
-@app.get("/vault_structure", response_model=vault_structure_schema)
+@app.get("/v1/vault/vault_structure", response_model=vault_structure_schema)
 async def get_vault_structure():
     return JSONResponse(content={"data": pg.get_vault_data('*')}, status_code=200)
 
 
-@app.post("/create_vault", response_model=create_vault_schema)
+@app.post("/v1/vault/create_vault", response_model=create_vault_schema)
 async def create_vault(request: Request):
     vault_key = crypt.create_vault_key()
     project_key = vault_key['project_key']
@@ -71,7 +71,7 @@ async def create_vault(request: Request):
     return JSONResponse(content={"message": "Empty vault created successfully.", "x-vault-key": vault_key['full_key']}, status_code=201)
 
 
-@app.post("/update_vault", response_model=update_vault_schema)
+@app.post("/v1/vault/update_vault", response_model=update_vault_schema)
 async def update_vault(request: Request, x_vault_key: str | None = Header(default=None)):
     if x_vault_key:
         project_key, salt, timestamp = x_vault_key.split('.')
