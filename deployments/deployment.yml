@@ -43,3 +43,8 @@ spec:
               secretKeyRef:
                 name: vault
                 key: PG_PORT
+          - name: VAULT_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: vault
+                key: VAULT_API_KEY
