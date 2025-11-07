@@ -1,9 +1,10 @@
-import dotenv
 import json
 import os
 import psycopg2
 
-dotenv.load_dotenv()
+if os.path.exists(".env"):
+    from dotenv import load_dotenv
+    load_dotenv()
 
 db = psycopg2.connect(
     host=os.getenv("PG_HOST"),
@@ -15,19 +16,18 @@ db = psycopg2.connect(
 
 cursor = db.cursor()
 
-#test_data = json.dumps({"example_key": "example_value"})
-
-#cursor.execute(f"INSERT INTO vault (project_key, project_data) VALUES ('test_key', '{test_data}');")
-#db.commit()
-
-
 def get_vault_data(project_key: str):
     data = {}
     
-    if project_key != '*':
-        cursor.execute(f"SELECT * FROM vault WHERE project_key = '{project_key}';")
-    else:
-        cursor.execute("SELECT * FROM vault;")
+    try: # prevents hanging on db error
+        if project_key != '*':
+            cursor.execute(f"SELECT * FROM vault WHERE project_key = '{project_key}';")
+        else:
+            cursor.execute("SELECT * FROM vault;")
+    except Exception as e:
+        print(f"Error fetching vault data: {e}")
+        cursor.rollback()
+        return data
         
     result = cursor.fetchall()
     for item in result:
@@ -36,6 +36,19 @@ def get_vault_data(project_key: str):
     return data
 
 
-def post_data_to_vault(project_key: str, project_data: dict):
-    cursor.execute(f"UPDATE vault SET project_data = '{json.dumps(project_data)}' WHERE project_key = '{project_key}';")
-    db.commit()
+def create_vault(project_key: str, project_data: dict):
+    try: # prevents hanging on db error
+        cursor.execute(f"INSERT INTO vault (project_key, project_data) VALUES ('{project_key}', '{json.dumps(project_data)}');")
+        db.commit()
+    except Exception as e:
+        print(f"Error creating vault: {e}")
+        db.rollback()
+
+
+def update_vault_data(project_key: str, project_data: dict):
+    try: # prevents hanging on db error
+        cursor.execute(f"UPDATE vault SET project_data = '{json.dumps(project_data)}' WHERE project_key = '{project_key}';")
+        db.commit()
+    except Exception as e:
+        print(f"Error updating vault: {e}")
+        db.rollback()
