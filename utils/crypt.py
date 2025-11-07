@@ -7,7 +7,7 @@ import secrets
 from datetime import datetime
 
 
-def encrypt(text, key):
+def encrypt(text, key): # takes in plaintext plus an encryption key and returns combined ciphertext
     cipher = AES.new(key, AES.MODE_EAX)
     ciphertext, tag = cipher.encrypt_and_digest(text.encode('utf-8'))
     
@@ -18,7 +18,7 @@ def encrypt(text, key):
     ])
 
 
-def decrypt(text, key):
+def decrypt(text, key): # takes in combined text plus a decryption key and returns plaintext
     ciphertext_b64, nonce_b64, tag_b64 = text.split('.')
     
     ciphertext = base64.b64decode(ciphertext_b64)
@@ -31,7 +31,7 @@ def decrypt(text, key):
     return plaintext.decode('utf-8')
 
 
-def create_vault_key():
+def create_vault_key(): # generates a new vault key (project key + salt + timestamp)
     key_info = {
         "project_key": base64.b64encode(secrets.token_bytes(64)).decode('utf-8'),
         "salt": base64.b64encode(secrets.token_bytes(128)).decode('utf-8'),
@@ -43,6 +43,6 @@ def create_vault_key():
     return key_info
 
 
-def derive_key(project_key, salt, iterations=500000):
+def derive_key(project_key, salt, iterations=500000): # derives an encryption/decryption key from project key and salt
     key = PBKDF2(project_key, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
     return key
