@@ -48,7 +48,7 @@ app = FastAPI(root_path=os.getenv("API_ROOT_PATH", ""))
 
 @app.get("/", response_model=status_schema)
 async def read_root():
-    return JSONResponse(content={"status": "ok", "version": "v0.1.1"}, status_code=200) # static return, update version # on release
+    return JSONResponse(content={"status": "ok", "version": "v0.1.2"}, status_code=200) # static return, update version # on release
 
 
 @app.get("/decrypt_vault", response_model=decrypt_schema)
@@ -92,8 +92,10 @@ async def decrypt_secret(x_vault_key: str | None = Header(default=None), x_produ
                 return JSONResponse(content={"message": "Invalid secret name."}, status_code=400)
 
             decrypted_secret = crypt.decrypt(data[project_key][x_product_name][x_secret_name], crypt.derive_key(project_key, salt))
+            
+            metadata = data[project_key].get("vault_metadata", {}) # get vault metadata
 
-            return JSONResponse(content={x_secret_name: decrypted_secret}, status_code=200)
+            return JSONResponse(content={"vault_metadata": metadata, "data": decrypted_secret}, status_code=200)
 
     return JSONResponse(content={"message": "Invalid request."}, status_code=400)
 
