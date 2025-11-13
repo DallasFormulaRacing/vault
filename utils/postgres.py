@@ -26,7 +26,7 @@ def get_vault_data(project_key: str):
             cursor.execute("SELECT * FROM vault;")
     except Exception as e:
         print(f"Error fetching vault data: {e}")
-        cursor.rollback()
+        db.rollback()
         return data
         
     result = cursor.fetchall()
