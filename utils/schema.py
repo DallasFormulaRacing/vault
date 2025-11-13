@@ -1,20 +1,19 @@
 from pydantic import BaseModel, Field
-from enum import Enum
-from typing import Union, List, Literal
 
 class exception_schema(BaseModel):
     message: str 
 
 class status_schema(BaseModel):
-    status: str = "ok"
-    version: str = "v0.1.0"
+    status: str
+    version: str
 
-class vault_structure_schema(BaseModel):
+class decrypt_schema(BaseModel):
+    vault_metadata: dict
     data: dict
     
 class create_vault_schema(BaseModel):
     message: str
-    x_vault_key: str = Field(alias="x-vault-key")
+    x_vault_key: str
     
 class update_vault_schema(BaseModel):
     message: str
