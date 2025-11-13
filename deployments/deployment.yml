@@ -48,3 +48,5 @@ spec:
               secretKeyRef:
                 name: vault
                 key: VAULT_API_KEY
+          - name: API_ROOT_PATH
+            value: "/v1/vault"
