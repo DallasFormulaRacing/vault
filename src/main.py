@@ -43,7 +43,7 @@ def update_vault_metadata(metadata: dict): # self explanatory
 # End of function definitions
 
 
-app = FastAPI()
+app = FastAPI(root_path=os.getenv("API_ROOT_PATH", ""))
 
 
 @app.get("/", response_model=status_schema)
@@ -51,8 +51,8 @@ async def read_root():
     return JSONResponse(content={"status": "ok", "version": "v0.1.1"}, status_code=200) # static return, update version # on release
 
 
-@app.get("/decrypt_vault", response_model=vault_structure_schema)
-async def decrypt_vault(x_vault_key: str | None = Header(default=None), product_name: str | None = Header(default=None)):
+@app.get("/decrypt_vault", response_model=decrypt_schema)
+async def decrypt_vault(x_vault_key: str | None = Header(default=None), x_product_name: str | None = Header(default=None)):
     if x_vault_key:
         try:
             project_key, salt, timestamp = x_vault_key.split('.') # split combined key
@@ -63,15 +63,37 @@ async def decrypt_vault(x_vault_key: str | None = Header(default=None), product_
         if data != {}: # check if vault data exists
             decrypted_data = {}
             
-            if product_name not in data[project_key]: # check if product exists in vault data
-                return JSONResponse(content={"message": "Invalid product name."}, status_code=400)
+            if x_product_name not in data[project_key]: # check if product exists in vault data
+                return JSONResponse(content={"message": "Invalid x-product-name"}, status_code=400)
             
-            for item in data[project_key][product_name]: # decrypt each item in the product
-                decrypted_data[item] = crypt.decrypt(data[project_key][product_name][item], crypt.derive_key(project_key, salt))
+            for item in data[project_key][x_product_name]: # decrypt each item in the product
+                decrypted_data[item] = crypt.decrypt(data[project_key][x_product_name][item], crypt.derive_key(project_key, salt))
 
             metadata = data[project_key].get("vault_metadata", {}) # get vault metadata
 
             return JSONResponse(content={"vault_metadata": metadata, "data": decrypted_data}, status_code=200)
+
+    return JSONResponse(content={"message": "Invalid request."}, status_code=400)
+
+
+@app.post("/decrypt_secret", response_model=decrypt_schema)
+async def decrypt_secret(x_vault_key: str | None = Header(default=None), x_product_name: str | None = Header(default=None), x_secret_name: str | None = Header(default=None)):
+    if x_vault_key:
+        try:
+            project_key, salt, timestamp = x_vault_key.split('.')
+            data = pg.get_vault_data(project_key)
+        except:
+            return JSONResponse(content={"message": f"Invalid x-vault-key"}, status_code=500)
+
+        if data != {}:
+            if x_product_name not in data[project_key]:
+                return JSONResponse(content={"message": "Invalid product name."}, status_code=400)
+            if x_secret_name not in data[project_key][x_product_name]:
+                return JSONResponse(content={"message": "Invalid secret name."}, status_code=400)
+
+            decrypted_secret = crypt.decrypt(data[project_key][x_product_name][x_secret_name], crypt.derive_key(project_key, salt))
+
+            return JSONResponse(content={"secret_value": decrypted_secret}, status_code=200)
 
     return JSONResponse(content={"message": "Invalid request."}, status_code=400)
 
@@ -93,15 +115,15 @@ async def create_vault(request: Request, x_api_key: str | None = Header(default=
         if body is None or len(body) == 0: # check if request body is empty
             return JSONResponse(content={"message": "Incorrect request format."}, status_code=400)
 
-        for product_name, product_value in body.items(): # iterate through each product in the request body
-            post_data[product_name] = {}
+        for x_product_name, product_value in body.items(): # iterate through each product in the request body
+            post_data[x_product_name] = {}
             for secret_name, secret_value in product_value.items(): # iterate through each secret in the product (from body)
                 if secret_value is not None and secret_value != "":
-                    if product_name == "vault_metadata": # if product is vault metadata, do not encrypt, else encrypt
-                        post_data[product_name][secret_name] = secret_value
+                    if x_product_name == "vault_metadata": # if product is vault metadata, do not encrypt, else encrypt
+                        post_data[x_product_name][secret_name] = secret_value
                         
                     else:
-                        post_data[product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(project_key, vault_key['salt']))
+                        post_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(project_key, vault_key['salt']))
 
         post_data["vault_metadata"] = update_vault_metadata(post_data["vault_metadata"])
         
@@ -132,23 +154,23 @@ async def update_vault(request: Request, x_vault_key: str | None = Header(defaul
         if body is None or len(body) == 0:
             return JSONResponse(content={"message": "Incorrect request format."}, status_code=400)
 
-        for product_name, product_value in body.items():
+        for x_product_name, product_value in body.items():
             for secret_name, secret_value in product_value.items():
                 if secret_value is not None and secret_value != "": # if secret value is not empty or null then update/add the value
-                    if product_name not in update_data: # if product does not exist in existing data then create it
-                        update_data[product_name] = {}
+                    if x_product_name not in update_data: # if product does not exist in existing data then create it
+                        update_data[x_product_name] = {}
                         
-                    if product_name == "vault_metadata": # if product is vault metadata, do not encrypt, else encrypt
+                    if x_product_name == "vault_metadata": # if product is vault metadata, do not encrypt, else encrypt
                         if secret_name != "version" and secret_name != "created": # prevent overwriting version and created fields
-                            update_data[product_name][secret_name] = secret_value
+                            update_data[x_product_name][secret_name] = secret_value
                             
                     else:
-                        update_data[product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(project_key, salt))
+                        update_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(project_key, salt))
                 
                 else:
-                    if secret_name in update_data[product_name]: # if secret exists in existing data then delete it
-                        if not (product_name == "vault_metadata" and (secret_name == "version" or secret_name == "created")): # if product is vault metadata, do not delete version and created fields
-                            del update_data[product_name][secret_name]
+                    if secret_name in update_data[x_product_name]: # if secret exists in existing data then delete it
+                        if not (x_product_name == "vault_metadata" and (secret_name == "version" or secret_name == "created")): # if product is vault metadata, do not delete version and created fields
+                            del update_data[x_product_name][secret_name]
 
         update_data["vault_metadata"] = update_vault_metadata(update_data.get("vault_metadata", {})) # update vault metadata
         
