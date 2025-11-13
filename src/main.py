@@ -76,7 +76,7 @@ async def decrypt_vault(x_vault_key: str | None = Header(default=None), x_produc
     return JSONResponse(content={"message": "Invalid request."}, status_code=400)
 
 
-@app.post("/decrypt_secret", response_model=decrypt_schema)
+@app.get("/decrypt_secret", response_model=decrypt_schema)
 async def decrypt_secret(x_vault_key: str | None = Header(default=None), x_product_name: str | None = Header(default=None), x_secret_name: str | None = Header(default=None)):
     if x_vault_key:
         try:
@@ -93,7 +93,7 @@ async def decrypt_secret(x_vault_key: str | None = Header(default=None), x_produ
 
             decrypted_secret = crypt.decrypt(data[project_key][x_product_name][x_secret_name], crypt.derive_key(project_key, salt))
 
-            return JSONResponse(content={"secret_value": decrypted_secret}, status_code=200)
+            return JSONResponse(content={x_secret_name: decrypted_secret}, status_code=200)
 
     return JSONResponse(content={"message": "Invalid request."}, status_code=400)
 
