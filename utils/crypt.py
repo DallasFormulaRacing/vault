@@ -31,18 +31,18 @@ def decrypt(text, key): # takes in combined text plus a decryption key and retur
     return plaintext.decode('utf-8')
 
 
-def create_vault_key(): # generates a new vault key (project key + salt + timestamp)
+def create_env_key(): # generates a new vault key (environment id + salt + timestamp)
     key_info = {
-        "project_key": base64.b64encode(secrets.token_bytes(64)).decode('utf-8'),
+        "environment_id": base64.b64encode(secrets.token_bytes(64)).decode('utf-8'),
         "salt": base64.b64encode(secrets.token_bytes(128)).decode('utf-8'),
         "timestamp": base64.b64encode(datetime.now().strftime("%Y-%m-%d %H:%M:%S").encode('utf-8')).decode('utf-8')
     }
-    
-    key_info['full_key'] = '.'.join([key_info['project_key'], key_info['salt'], key_info['timestamp']])
+
+    key_info['full_key'] = '.'.join([key_info['environment_id'], key_info['salt'], key_info['timestamp']])
     
     return key_info
 
 
-def derive_key(project_key, salt, iterations=500000): # derives an encryption/decryption key from project key and salt
-    key = PBKDF2(project_key, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
+def derive_key(environment_id, salt, iterations=500000): # derives an encryption/decryption key from environment id and salt
+    key = PBKDF2(environment_id, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
     return key

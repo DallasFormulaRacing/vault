@@ -145,8 +145,8 @@ async def create_vault(request: Request, x_api_key: str | None = Header(default=
     if x_api_key != os.getenv("VAULT_API_KEY"): # suuuuuuuuuuuuuuuuuuuper basic api key check, mostly to stop people from flooding the database (shouldn't be needed anyways)
         return JSONResponse(content={"message": "Invalid API key."}, status_code=403)
     
-    vault_key = crypt.create_vault_key() # generate new vault key using crypt util
-    environment_id = vault_key['environment_id']
+    env_key = crypt.create_env_key() # generate new vault key using crypt util
+    environment_id = env_key['environment_id']
     if await request.body(): # check if request body is not empty
         post_data = {"vault_metadata": {}}
         try: # check if request body is valid json
@@ -165,18 +165,18 @@ async def create_vault(request: Request, x_api_key: str | None = Header(default=
                         post_data[x_product_name][secret_name] = secret_value
                         
                     else:
-                        post_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(environment_id, vault_key['salt']))
+                        post_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(environment_id, env_key['salt']))
 
         post_data["vault_metadata"] = update_vault_metadata(post_data["vault_metadata"])
         
         try: # try posting to postgres, if fail rollback (stops the api from hanging on db error)
             pg.create_vault(environment_id, post_data)
-            return JSONResponse(content={"message": "Vault created successfully.", "x-vault-key": vault_key['full_key']}, status_code=201)
+            return JSONResponse(content={"message": "Vault created successfully.", "x-vault-key": env_key['full_key']}, status_code=201)
         except Exception as e:
             return JSONResponse(content={"message": f"Error creating vault: {e}"}, status_code=500)
         
     pg.create_vault(environment_id, {"vault_metadata": update_vault_metadata({})})
-    return JSONResponse(content={"message": "Empty vault created successfully.", "x-vault-key": vault_key['full_key']}, status_code=201)
+    return JSONResponse(content={"message": "Empty vault created successfully.", "x-vault-key": env_key['full_key']}, status_code=201)
 
 
 @app.post("/update_vault", response_model=update_vault_schema)
