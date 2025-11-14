@@ -52,24 +52,24 @@ async def read_root():
 
 
 @app.get("/decrypt_vault", response_model=decrypt_schema)
-async def decrypt_vault(x_vault_key: str | None = Header(default=None), x_product_name: str | None = Header(default=None)):
-    if x_vault_key:
+async def decrypt_vault(x_env_key: str | None = Header(default=None), x_product_name: str | None = Header(default=None)):
+    if x_env_key:
         try:
-            project_key, salt, timestamp = x_vault_key.split('.') # split combined key
-            data = pg.get_vault_data(project_key)
+            environment_id, salt, timestamp = x_env_key.split('.') # split combined key
+            data = pg.get_vault_data(environment_id)
         except:
             return JSONResponse(content={"message": f"Invalid x-vault-key"}, status_code=500)
 
         if data != {}: # check if vault data exists
             decrypted_data = {}
             
-            if x_product_name not in data[project_key]: # check if product exists in vault data
+            if x_product_name not in data[environment_id]: # check if product exists in vault data
                 return JSONResponse(content={"message": "Invalid x-product-name"}, status_code=400)
             
-            for item in data[project_key][x_product_name]: # decrypt each item in the product
-                decrypted_data[item] = crypt.decrypt(data[project_key][x_product_name][item], crypt.derive_key(project_key, salt))
+            for item in data[environment_id][x_product_name]: # decrypt each item in the product
+                decrypted_data[item] = crypt.decrypt(data[environment_id][x_product_name][item], crypt.derive_key(environment_id, salt))
 
-            metadata = data[project_key].get("vault_metadata", {}) # get vault metadata
+            metadata = data[environment_id].get("vault_metadata", {}) # get vault metadata
 
             return JSONResponse(content={"vault_metadata": metadata, "data": decrypted_data}, status_code=200)
 
@@ -77,25 +77,65 @@ async def decrypt_vault(x_vault_key: str | None = Header(default=None), x_produc
 
 
 @app.get("/decrypt_secret", response_model=decrypt_schema)
-async def decrypt_secret(x_vault_key: str | None = Header(default=None), x_product_name: str | None = Header(default=None), x_secret_name: str | None = Header(default=None)):
-    if x_vault_key:
+async def decrypt_secret(x_env_key: str | None = Header(default=None), x_product_name: str | None = Header(default=None), x_secret_name: str | None = Header(default=None)):
+    if x_env_key:
         try:
-            project_key, salt, timestamp = x_vault_key.split('.')
-            data = pg.get_vault_data(project_key)
+            environment_id, salt, timestamp = x_env_key.split('.')
+            data = pg.get_vault_data(environment_id)
         except:
             return JSONResponse(content={"message": f"Invalid x-vault-key"}, status_code=500)
 
         if data != {}:
-            if x_product_name not in data[project_key]:
+            if x_product_name not in data[environment_id]:
                 return JSONResponse(content={"message": "Invalid product name."}, status_code=400)
-            if x_secret_name not in data[project_key][x_product_name]:
+            if x_secret_name not in data[environment_id][x_product_name]:
                 return JSONResponse(content={"message": "Invalid secret name."}, status_code=400)
 
-            decrypted_secret = crypt.decrypt(data[project_key][x_product_name][x_secret_name], crypt.derive_key(project_key, salt))
+            decrypted_secret = crypt.decrypt(data[environment_id][x_product_name][x_secret_name], crypt.derive_key(environment_id, salt))
             
-            metadata = data[project_key].get("vault_metadata", {}) # get vault metadata
+            metadata = data[environment_id].get("vault_metadata", {}) # get vault metadata
 
             return JSONResponse(content={"vault_metadata": metadata, "data": decrypted_secret}, status_code=200)
+
+    return JSONResponse(content={"message": "Invalid request."}, status_code=400)
+
+
+@app.get("/metadata", response_model=metadata_schema)
+async def metadata(x_env_key: str | None = Header(default=None)):
+    if x_env_key:
+        try:
+            environment_id = x_env_key.split('.')[0]
+            data = pg.get_vault_data(environment_id)
+        except:
+            return JSONResponse(content={"message": f"Invalid x-vault-key"}, status_code=500)
+
+        if data != {}:
+            metadata = data[environment_id].get("vault_metadata", {}) # get vault metadata
+
+            return JSONResponse(content={"vault_metadata": metadata}, status_code=200)
+
+    return JSONResponse(content={"message": "Invalid request."}, status_code=400)
+
+
+@app.get("/list_products", response_model=list_products_schema)
+async def list_products(x_env_key: str | None = Header(default=None)):
+    if x_env_key:
+        try:
+            environment_id = x_env_key.split('.')[0]
+            data = pg.get_vault_data(environment_id)
+        except:
+            return JSONResponse(content={"message": f"Invalid x-vault-key"}, status_code=500)
+        
+        if data != {}:
+            product_list = []
+            for item in data[environment_id]:
+                if item != "vault_metadata":
+                    product_list.append(item)
+
+            if product_list:
+                return JSONResponse(content={"vault_metadata": data[environment_id].get("vault_metadata", {}), "products": product_list}, status_code=200)
+            else:
+                return JSONResponse(content={"message": "No products found."}, status_code=404)
 
     return JSONResponse(content={"message": "Invalid request."}, status_code=400)
 
@@ -106,7 +146,7 @@ async def create_vault(request: Request, x_api_key: str | None = Header(default=
         return JSONResponse(content={"message": "Invalid API key."}, status_code=403)
     
     vault_key = crypt.create_vault_key() # generate new vault key using crypt util
-    project_key = vault_key['project_key']
+    environment_id = vault_key['environment_id']
     if await request.body(): # check if request body is not empty
         post_data = {"vault_metadata": {}}
         try: # check if request body is valid json
@@ -125,26 +165,26 @@ async def create_vault(request: Request, x_api_key: str | None = Header(default=
                         post_data[x_product_name][secret_name] = secret_value
                         
                     else:
-                        post_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(project_key, vault_key['salt']))
+                        post_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(environment_id, vault_key['salt']))
 
         post_data["vault_metadata"] = update_vault_metadata(post_data["vault_metadata"])
         
         try: # try posting to postgres, if fail rollback (stops the api from hanging on db error)
-            pg.create_vault(project_key, post_data)
+            pg.create_vault(environment_id, post_data)
             return JSONResponse(content={"message": "Vault created successfully.", "x-vault-key": vault_key['full_key']}, status_code=201)
         except Exception as e:
             return JSONResponse(content={"message": f"Error creating vault: {e}"}, status_code=500)
         
-    pg.create_vault(project_key, {"vault_metadata": update_vault_metadata({})})
+    pg.create_vault(environment_id, {"vault_metadata": update_vault_metadata({})})
     return JSONResponse(content={"message": "Empty vault created successfully.", "x-vault-key": vault_key['full_key']}, status_code=201)
 
 
 @app.post("/update_vault", response_model=update_vault_schema)
-async def update_vault(request: Request, x_vault_key: str | None = Header(default=None)):
-    if x_vault_key: # check if vault key is provided
+async def update_vault(request: Request, x_env_key: str | None = Header(default=None)):
+    if x_env_key: # check if vault key is provided
         try:
-            project_key, salt, timestamp = x_vault_key.split('.')
-            update_data = pg.get_vault_data(project_key)[project_key]
+            environment_id, salt, timestamp = x_env_key.split('.')
+            update_data = pg.get_vault_data(environment_id)[environment_id]
         except:
             return JSONResponse(content={"message": f"Invalid x-vault-key"}, status_code=500)
         
@@ -167,7 +207,7 @@ async def update_vault(request: Request, x_vault_key: str | None = Header(defaul
                             update_data[x_product_name][secret_name] = secret_value
                             
                     else:
-                        update_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(project_key, salt))
+                        update_data[x_product_name][secret_name] = crypt.encrypt(secret_value, crypt.derive_key(environment_id, salt))
                 
                 else:
                     if secret_name in update_data[x_product_name]: # if secret exists in existing data then delete it
@@ -177,7 +217,7 @@ async def update_vault(request: Request, x_vault_key: str | None = Header(defaul
         update_data["vault_metadata"] = update_vault_metadata(update_data.get("vault_metadata", {})) # update vault metadata
         
         try: # try updating vault data in postgres and rollback on fail
-            pg.update_vault_data(project_key, update_data)
+            pg.update_vault_data(environment_id, update_data)
         except Exception as e:
             return JSONResponse(content={"message": f"Error updating vault: {e}"}, status_code=500)
 
